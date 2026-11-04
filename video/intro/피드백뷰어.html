@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>피드백 뷰어</title>
+<style>
+:root{--bg:#141414;--panel:#1f1f1f;--line:#333;--text:#eee;--dim:#999;--acc:#e2572b;--yel:#f2c232;--cut:#d9443a;--fx:#3e9ad6}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 -apple-system,"Apple SD Gothic Neo","Pretendard",sans-serif}
+header{display:flex;gap:12px;align-items:center;padding:10px 16px;border-bottom:1px solid var(--line)}
+header h1{font-size:16px;margin:0;font-weight:700}
+header .file{color:var(--dim);font-size:13px;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+button,select,input,textarea{font:inherit;color:inherit}
+select{background:#2b2b2b;border:1px solid #444;border-radius:8px;padding:6px 8px}
+button{background:#2b2b2b;border:1px solid #444;border-radius:8px;padding:6px 12px;cursor:pointer}
+button:hover{background:#363636}
+button.acc{background:var(--acc);border-color:var(--acc);color:#fff;font-weight:700}
+button.cut{background:var(--cut);border-color:var(--cut);color:#fff;font-weight:700}
+main{display:grid;grid-template-columns:minmax(0,1fr) 400px;gap:0;height:calc(100vh - 53px)}
+#left{padding:12px 16px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+#left>.row,#left>#bar{flex:none}
+#right{border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+#stage{position:relative;background:#000;border-radius:10px;overflow:hidden;flex:1 1 auto;min-height:160px}   /* 남은 높이만큼 — 조작부는 늘 보인다 */
+#stage video{position:absolute;inset:0;width:100%;height:100%;display:block;object-fit:contain}
+#overlay{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none}   /* 영상이 실제로 보이는 칸에 맞춘다(fitOverlay) */
+#overlay.pick{pointer-events:auto;cursor:crosshair;outline:3px dashed var(--yel);outline-offset:-3px}
+.pin{position:absolute;width:44px;height:44px;margin:-22px 0 0 -22px;border:4px solid var(--yel);border-radius:50%;box-shadow:0 0 0 2px #000}
+.pin span{position:absolute;left:44px;top:-6px;background:var(--yel);color:#000;font-weight:800;font-size:13px;padding:0 6px;border-radius:6px;white-space:nowrap}
+#drop{position:absolute;inset:0;display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;color:var(--dim);text-align:center;padding:20px}
+#tc{font:700 26px/1 ui-monospace,Menlo,monospace;letter-spacing:1px}
+#tc small{font-size:14px;color:var(--dim);font-weight:400;margin-left:8px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:10px}
+#bar{position:relative;height:38px;background:#262626;border-radius:8px;margin-top:10px;cursor:pointer;overflow:hidden}
+#bar .ph{position:absolute;top:0;bottom:0;width:2px;background:#fff}
+#bar .rg{position:absolute;top:6px;bottom:6px;background:rgba(217,68,58,.55);border:1px solid var(--cut);border-radius:4px}
+#bar .rg.sel{background:rgba(242,194,50,.35);border-color:var(--yel)}
+#bar .pt{position:absolute;top:4px;width:10px;height:10px;margin-left:-5px;border-radius:50%;background:var(--yel)}
+#bar .ticks{position:absolute;inset:auto 0 0 0;height:12px;font-size:10px;color:#777}
+.key{color:var(--dim);font-size:12px}
+kbd{background:#2b2b2b;border:1px solid #444;border-bottom-width:2px;border-radius:4px;padding:0 5px;font-size:12px}
+#form{background:var(--panel);border-bottom:1px solid var(--line);padding:12px;display:none;flex:none;max-height:60%;overflow:auto}
+#form.on{display:block}
+#form label{font-size:12px;color:var(--dim)}
+#form input[type=text],#form textarea,#form select{background:#151515;border:1px solid #444;border-radius:6px;padding:6px 8px}
+#form textarea{width:100%;min-height:64px;resize:vertical}
+.tin{width:110px;font-family:ui-monospace,Menlo,monospace}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{padding:3px 10px;border-radius:999px;border:1px solid #555;cursor:pointer;font-size:13px}
+.chip.on{background:var(--yel);color:#000;border-color:var(--yel);font-weight:700}
+#list{flex:1;overflow:auto;padding:8px}
+.item{border:1px solid var(--line);background:var(--panel);border-radius:10px;padding:8px 10px;margin-bottom:8px;cursor:pointer}
+.item:hover{border-color:#555}
+.item .t{font:700 14px ui-monospace,Menlo,monospace}
+.item .k{font-size:12px;padding:1px 8px;border-radius:999px;background:#333;margin-left:6px}
+.item .k.cut{background:var(--cut);color:#fff}
+.item .m{margin-top:4px;white-space:pre-wrap}
+.item .a{display:flex;gap:6px;margin-top:6px}
+.item .a button{padding:2px 8px;font-size:12px}
+.item img,.item video.th{width:auto;max-width:100%;height:auto;max-height:140px;border-radius:6px;margin-top:6px;display:block;background:#000;pointer-events:none}   /* 썸네일 = 그림(Safari) 또는 그 시각에 멈춘 작은 영상(Chrome file:// 도 보임) */
+#foot{border-top:1px solid var(--line);padding:10px;display:flex;gap:8px;flex-wrap:wrap}
+#toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:var(--yel);color:#000;font-weight:700;padding:8px 16px;border-radius:999px;display:none}
+.hint{color:var(--dim);font-size:13px;padding:10px}
+#subov{position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;display:flex;justify-content:center;align-items:flex-end}   /* ★자막 = 영상 칸 아래쪽에 크게 (fitOverlay 가 자리 · 크기를 맞춘다) */
+#subov span{display:none;background:rgba(0,0,0,.75);color:#fff;font-weight:800;border-radius:.3em;padding:.2em .6em;max-width:92%;text-align:center;line-height:1.35;margin-bottom:5%;text-shadow:0 1px 2px #000}
+#subov.on span{display:inline-block}
+#cue{flex:none;margin-top:8px;min-height:30px;padding:5px 12px;border-radius:8px;background:#1d1d1d;border:1px solid var(--line);font-size:15px;display:flex;gap:10px;align-items:center}
+#cue .ct{font:12px ui-monospace,Menlo,monospace;color:var(--dim);white-space:nowrap}
+#cue.off{color:var(--dim);font-size:13px}
+#tabs{display:flex;border-bottom:1px solid var(--line);flex:none}
+#tabs button{flex:1;border:0;border-radius:0;background:transparent;padding:9px 0;color:var(--dim)}
+#tabs button.on{color:var(--text);font-weight:700;box-shadow:inset 0 -2px 0 var(--acc)}
+#cues{flex:1;overflow:auto;padding:6px 8px}
+.ci{display:flex;gap:10px;padding:6px 8px;border-radius:8px;cursor:pointer}
+.ci:hover{background:#262626}
+.ci.on{background:#3a2f12;outline:1px solid var(--yel)}
+.ci .ct{font:12px ui-monospace,Menlo,monospace;color:var(--dim);white-space:nowrap;padding-top:2px}
+.item .ln{margin-top:4px;font-size:13px;color:var(--yel)}
+#fl{color:var(--yel)}
+</style>
+</head>
+<body>
+<header>
+  <h1>피드백 뷰어</h1>
+  <div class="file" id="fname">영상 불러오는 중…</div>
+  <label><button onclick="document.getElementById('pick').click()">영상 열기</button></label>
+  <label><button onclick="document.getElementById('pickSub').click()" title="자막 파일(.srt · .vtt)을 열면 대사 줄이 나옵니다">자막 열기</button></label>
+  <input type="file" id="pick" accept="video/*" hidden>
+  <input type="file" id="pickSub" accept=".srt,.vtt,text/plain" hidden>
+</header>
+<main>
+<section id="left">
+  <div id="stage">
+    <video id="v" preload="auto"></video>
+    <div id="subov"><span id="subtx"></span></div>
+    <div id="overlay"></div>
+    <div id="drop"><b>영상 파일을 여기로 끌어다 놓거나 «영상 열기»를 눌러 주세요</b><span>out/ 폴더의 mp4</span></div>
+  </div>
+  <div class="row">
+    <div id="tc">00:00:00<small>/ 00:00:00</small></div>
+    <span style="flex:1"></span>
+    <button onclick="step(-1/FPS)" title="한 프레임 뒤">◀|</button>
+    <button onclick="step(-1)">−1초</button>
+    <button id="pp" onclick="toggle()" style="min-width:70px">▶ 재생</button>
+    <button onclick="step(1)">+1초</button>
+    <button onclick="step(1/FPS)" title="한 프레임 앞">|▶</button>
+    <button id="ccb" onclick="toggleCC()" title="영상 위 자막 보이기 · 숨기기 (C)">자막 켬</button>
+    <select id="rate" onchange="V.playbackRate=+this.value"><option value=".5">0.5×</option><option value="1" selected>1×</option><option value="1.5">1.5×</option><option value="2">2×</option></select>
+  </div>
+  <div id="cue" class="off">자막이 없어요 — «자막 열기»로 .srt 를 열면 지금 나오는 대사가 여기 보여요</div>
+  <div id="bar"><div class="ticks" id="ticks"></div></div>
+  <div class="row">
+    <button class="acc" onclick="newPoint()">● 여기 문제 <kbd>N</kbd></button>
+    <button class="cut" onclick="markIn()">[ 범위 시작 <kbd>I</kbd></button>
+    <button class="cut" onclick="markOut()">범위 끝 ] <kbd>O</kbd></button>
+    <span class="key"><kbd>Space</kbd> 재생/멈춤 · <kbd>←</kbd><kbd>→</kbd> 1초 · <kbd>,</kbd><kbd>.</kbd> 한 프레임 · <kbd>[</kbd><kbd>]</kbd> 앞 · 다음 대사 · <kbd>C</kbd> 자막</span>
+  </div>
+
+</section>
+<aside id="right">
+  <div id="form">
+    <div class="row" style="margin-top:0">
+      <b id="ftitle">메모</b><span style="flex:1"></span>
+      <label>시작 <input type="text" class="tin" id="fa"></label>
+      <label id="fbwrap">끝 <input type="text" class="tin" id="fb"></label>
+    </div>
+    <div class="row"><div class="chips" id="kinds"></div></div>
+    <div class="row" id="lnrow" style="display:none"><span class="key">대사</span><span id="fl"></span></div>
+    <div class="row" id="pinrow"><button onclick="pickPin()">화면에 위치 찍기</button><span class="key" id="pinv">찍지 않아도 돼요 — 어디가 문제인지 화면을 눌러 표시</span></div>
+    <div class="row" id="prevrow" style="display:none"><button onclick="previewCut()">✂ 빼고 이어 보기</button><span class="key">범위 앞 3초 → 범위 건너뛰고 → 뒤 3초</span></div>
+    <div class="row"><textarea id="fm" placeholder="무엇이 이상한지 편하게 적어 주세요. 예) 동그라미가 화면 바뀐 뒤에도 남아 있어"></textarea></div>
+    <div class="row"><button class="acc" onclick="save()">저장 <kbd>⌘↵</kbd></button><button onclick="closeForm()">취소 <kbd>Esc</kbd></button></div>
+  </div>
+  <div id="tabs"><button id="tMemo" class="on" onclick="tab('memo')">메모</button><button id="tCue" onclick="tab('cue')">대사 <span id="cueN"></span></button></div>
+  <div id="list"></div>
+  <div id="cues" style="display:none"></div>
+  <div id="foot">
+    <button class="acc" onclick="copyAll()">목록 복사</button>
+    <button onclick="saveMd()">파일로 저장</button>
+    <span style="flex:1"></span>
+    <button onclick="clearAll()">모두 지우기</button>
+  </div>
+</aside>
+</main>
+<div id="toast"></div>
+<canvas id="cv" width="480" height="270" hidden></canvas>
+<script>
+// 굽기 뒤 스킬이 영상 이름 · fps 를 채워 만든다(make_viewer.py) · 안 채워졌으면 ?v=경로 → «영상 열기»
+const FPS = +'30.0' || 30;
+const CANDIDATES = ['out/StudyPet_소개.mp4'].filter(x => !x.startsWith('__'));
+// ★대사 줄 — 굽기 때 스킬이 자막(.srt)을 읽어 [시작, 끝, 글] 로 심는다 · 없으면 «자막 열기»
+const CUES0 = [];
+let CUES = CUES0.slice(), cueI = -2;
+const POINT_KINDS = ['화면 표시 이상', '글씨·크기', '카메라·줌', '타이밍', '소리·대사', '전환·이음새', '기타'];
+const RANGE_KINDS = ['들어내기', '빠르게', '느리게', '멈춰서 보여주기', '기타'];
+const $ = id => document.getElementById(id);
+const V = $('v');
+let thumbFail = false, vname = '', notes = [], cur = null, inT = null, pinMode = false, preview = null;
+
+// ── 시간 표기 ───────────────────────────────
+function tc(t, ff = true) {
+  t = Math.max(0, t || 0); const m = Math.floor(t / 60), s = Math.floor(t % 60), f = Math.floor((t - Math.floor(t)) * FPS + 1e-6);
+  return String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0') + (ff ? ':' + String(f).padStart(2, '0') : '');
+}
+function parseTc(x) {
+  x = String(x).trim(); if (!x) return null;
+  if (/^\d+(\.\d+)?$/.test(x)) return +x;
+  const p = x.split(':').map(Number); if (p.some(isNaN)) return null;
+  if (p.length === 2) return p[0] * 60 + p[1];
+  if (p.length === 3) return p[0] * 60 + p[1] + p[2] / FPS;
+  return null;
+}
+
+// ── 영상 불러오기 ────────────────────────────
+function load(src, name) {
+  V.src = src; vname = name; $('fname').textContent = name; $('drop').style.display = 'none';
+  try { notes = JSON.parse(localStorage.getItem('fb:' + name) || '[]'); } catch (e) { notes = []; }
+  if (!CUES0.length) { try { CUES = JSON.parse(localStorage.getItem('fbc:' + name) || '[]'); } catch (e) { CUES = []; } }
+  renderCues(); render();
+}
+(function tryDefault() {
+  const q = new URLSearchParams(location.search).get('v'); const list = (q ? [q] : []).concat(CANDIDATES);
+  (function next(i) {
+    if (i >= list.length) { $('drop').style.display = 'flex'; $('fname').textContent = '영상을 열어 주세요'; return; }
+    const t = document.createElement('video'); t.preload = 'metadata';
+    t.onloadedmetadata = () => load(list[i], decodeURIComponent(list[i].split('/').pop()));
+    t.onerror = () => next(i + 1); t.src = list[i];
+  })(0);
+})();
+$('pickSub').onchange = e => {
+  const f = e.target.files[0]; if (!f) return; const r = new FileReader();
+  r.onload = () => { const c = parseSrt(r.result); if (!c.length) return toast('자막 줄을 못 읽었어요 — .srt 파일인지 봐 주세요');
+    CUES = c; try { localStorage.setItem('fbc:' + vname, JSON.stringify(c)); } catch (er) {} cueI = -2; renderCues(); toast('대사 ' + c.length + '줄을 불러왔어요'); };
+  r.readAsText(f, 'utf-8');
+};
+$('pick').onchange = e => { const f = e.target.files[0]; if (f) load(URL.createObjectURL(f), f.name); };
+document.addEventListener('dragover', e => e.preventDefault());
+document.addEventListener('drop', e => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && f.type.startsWith('video')) load(URL.createObjectURL(f), f.name); });
+
+// ── 재생 ─────────────────────────────────────
+function toggle() { V.paused ? V.play() : V.pause(); }
+function step(d) { V.pause(); V.currentTime = Math.min(Math.max(0, V.currentTime + d), V.duration || 0); }
+V.addEventListener('play', () => $('pp').textContent = '❚❚ 멈춤');
+V.addEventListener('pause', () => $('pp').textContent = '▶ 재생');
+V.addEventListener('loadedmetadata', () => { fitOverlay(); render(); });
+function fitOverlay() {   // object-fit:contain 으로 생기는 위아래 · 좌우 여백을 빼고, 영상이 실제로 보이는 칸에 겹친다 (세로 영상도)
+  const st = $('stage'), o = $('overlay'); const W = st.clientWidth, H = st.clientHeight, vw = V.videoWidth || 16, vh = V.videoHeight || 9;
+  const s = Math.min(W / vw, H / vh), w = vw * s, h = vh * s;
+  Object.assign(o.style, { left: (W - w) / 2 + 'px', top: (H - h) / 2 + 'px', width: w + 'px', height: h + 'px' });
+  const sv = $('subov'); Object.assign(sv.style, { left: '0px', top: o.style.top, width: W + 'px', height: o.style.height, fontSize: Math.max(22, Math.min(h * 0.05, W * 0.05)) + 'px' });   // 세로 영상도 화면 폭을 다 써서 크게
+}
+window.addEventListener('resize', fitOverlay); new ResizeObserver(fitOverlay).observe($('stage'));
+function tick() {
+  $('tc').innerHTML = tc(V.currentTime) + '<small>/ ' + tc(V.duration) + '</small>';
+  const ph = $('bar').querySelector('.ph'); if (ph && V.duration) ph.style.left = (V.currentTime / V.duration * 100) + '%';
+  if (preview) {
+    if (preview.stage === 0 && V.currentTime >= preview.a) { V.currentTime = preview.b; preview.stage = 1; }
+    else if (preview.stage === 1 && V.currentTime >= preview.b + 3) { V.pause(); preview = null; }
+  }
+  showCue(); drawPins(); requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+$('bar').onclick = e => { if (!V.duration) return; const r = $('bar').getBoundingClientRect(); V.currentTime = (e.clientX - r.left) / r.width * V.duration; };
+
+// ── 화면 위치 표시 ───────────────────────────
+function drawPins() {
+  const o = $('overlay'); let h = '';
+  const show = cur && cur.pin ? [Object.assign({ n: '●' }, cur)] : [];
+  notes.forEach((n, i) => { if (n.pin && !n.b && Math.abs(V.currentTime - n.a) < 0.6) show.push(Object.assign({ n: i + 1 }, n)); });
+  show.forEach(n => h += `<div class="pin" style="left:${n.pin[0]}%;top:${n.pin[1]}%"><span>${n.n}</span></div>`);
+  if (o.dataset.h !== h) { o.innerHTML = h; o.dataset.h = h; }
+}
+function pickPin() { pinMode = true; $('overlay').classList.add('pick'); $('pinv').textContent = '영상 위 문제 자리를 눌러 주세요'; }
+$('overlay').onclick = e => {
+  if (!pinMode || !cur) return; const r = $('overlay').getBoundingClientRect();
+  cur.pin = [+((e.clientX - r.left) / r.width * 100).toFixed(1), +((e.clientY - r.top) / r.height * 100).toFixed(1)];
+  pinMode = false; $('overlay').classList.remove('pick'); $('pinv').textContent = `찍음 (${cur.pin[0]}%, ${cur.pin[1]}%) — 다시 누르면 바꿔요`;
+};
+
+// ── 메모 만들기 ──────────────────────────────
+function openForm(n) {
+  V.pause(); cur = n; const range = n.b != null;
+  $('ftitle').textContent = range ? '범위 메모' : '한 시점 메모';
+  $('fa').value = tc(n.a); $('fb').value = range ? tc(n.b) : ''; $('fbwrap').style.display = range ? '' : 'none';
+  $('pinrow').style.display = range ? 'none' : ''; $('prevrow').style.display = range ? '' : 'none';
+  $('pinv').textContent = n.pin ? `찍음 (${n.pin[0]}%, ${n.pin[1]}%)` : '찍지 않아도 돼요 — 어디가 문제인지 화면을 눌러 표시';
+  $('kinds').innerHTML = (range ? RANGE_KINDS : POINT_KINDS).map(k => `<span class="chip${n.kind === k ? ' on' : ''}" onclick="setKind(this,'${k}')">${k}</span>`).join('');
+  $('fm').value = n.memo || ''; $('form').classList.add('on'); $('fm').focus(); formLine(); render();
+}
+function setKind(el, k) { cur.kind = k; [...$('kinds').children].forEach(c => c.classList.toggle('on', c === el)); }
+function newPoint() { openForm({ a: V.currentTime, kind: '화면 표시 이상' }); }
+function markIn() { V.pause(); inT = V.currentTime; toast('범위 시작 ' + tc(inT) + ' — 끝에서 O'); render(); }
+function markOut() {
+  V.pause(); let a = inT == null ? Math.max(0, V.currentTime - 2) : inT, b = V.currentTime; if (b < a) [a, b] = [b, a];
+  inT = null; openForm({ a, b, kind: '들어내기' });
+}
+function closeForm() { cur = null; pinMode = false; $('overlay').classList.remove('pick'); $('form').classList.remove('on'); render(); }
+function thumb(t) {
+  return new Promise(res => {
+    const c = $('cv'), g = c.getContext('2d'); const done = () => { try { const vw = V.videoWidth || 16, vh = V.videoHeight || 9; c.width = 480; c.height = Math.round(480 * vh / vw); g.drawImage(V, 0, 0, c.width, c.height); res(c.toDataURL('image/jpeg', .7)); } catch (e) { thumbFail = true; res(null); } };
+    if (Math.abs(V.currentTime - t) < 0.02) return done();
+    V.addEventListener('seeked', function f() { V.removeEventListener('seeked', f); done(); }); V.currentTime = t;
+  });
+}
+async function save() {
+  if (!cur) return; const a = parseTc($('fa').value), b = cur.b != null ? parseTc($('fb').value) : null;
+  if (a == null || (cur.b != null && b == null)) return toast('시간을 01:23 이나 01:23:10 처럼 적어 주세요');
+  cur.a = a; if (cur.b != null) cur.b = Math.max(a, b); cur.memo = $('fm').value.trim(); cur.line = lineFor(cur);
+  const back = V.currentTime; cur.img = await thumb(cur.a); V.currentTime = back;
+  if (!notes.includes(cur)) notes.push(cur);
+  notes.sort((x, y) => x.a - y.a); persist(); closeForm(); toast('저장했어요');
+}
+function previewCut() {
+  const a = parseTc($('fa').value), b = parseTc($('fb').value); if (a == null || b == null) return;
+  preview = { a, b, stage: 0 }; V.currentTime = Math.max(0, a - 3); V.play();
+}
+function persist() { try { localStorage.setItem('fb:' + vname, JSON.stringify(notes)); } catch (e) {} render(); }
+
+// ── 목록 ─────────────────────────────────────
+function render() {
+  const bar = $('bar'); bar.querySelectorAll('.rg,.pt,.ph').forEach(x => x.remove());
+  const D = V.duration || 1;
+  notes.forEach(n => {
+    const el = document.createElement('div');
+    if (n.b != null) { el.className = 'rg'; el.style.left = n.a / D * 100 + '%'; el.style.width = Math.max(.3, (n.b - n.a) / D * 100) + '%'; }
+    else { el.className = 'pt'; el.style.left = n.a / D * 100 + '%'; }
+    bar.appendChild(el);
+  });
+  if (inT != null) { const el = document.createElement('div'); el.className = 'rg sel'; el.style.left = inT / D * 100 + '%'; el.style.width = '.4%'; bar.appendChild(el); }
+  const ph = document.createElement('div'); ph.className = 'ph'; bar.appendChild(ph);
+  if (V.duration) { let h = ''; for (let m = 0; m * 60 < D; m++) h += `<span style="position:absolute;left:${m * 60 / D * 100}%">${m}분</span>`; $('ticks').innerHTML = h; }
+  $('list').innerHTML = notes.length ? notes.map((n, i) => `
+    <div class="item" onclick="V.currentTime=${n.b != null ? Math.max(0, n.a - 2) : n.a}">
+      <div><span class="t">${i + 1}. ${tc(n.a)}${n.b != null ? ' ~ ' + tc(n.b) : ''}</span><span class="k${n.kind === '들어내기' ? ' cut' : ''}">${n.kind || ''}</span></div>
+      ${n.line ? `<div class="ln">${esc(n.line)}</div>` : ''}
+      ${n.memo ? `<div class="m">${esc(n.memo)}</div>` : ''}
+      ${n.img ? `<img src="${n.img}">` : (V.currentSrc ? `<video class="th" muted playsinline preload="metadata" src="${V.currentSrc.split('#')[0]}#t=${n.a.toFixed(2)}"></video>` : '')}
+      <div class="a"><button onclick="event.stopPropagation();openForm(notes[${i}])">고치기</button><button onclick="event.stopPropagation();del(${i})">지우기</button></div>
+    </div>`).join('') : '<div class="hint">영상을 보다가 이상한 곳에서 <b>N</b>(한 시점) 또는 <b>I … O</b>(범위)를 눌러 메모를 남겨 주세요.<br><br>다 보면 <b>목록 복사</b> → Claude 에게 붙여 넣기.</div>';
+}
+function esc(s) { return String(s).replace(/[&<>]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' })[c]); }
+function del(i) { if (confirm('이 메모를 지울까요?')) { notes.splice(i, 1); persist(); } }
+function clearAll() { if (confirm('메모를 모두 지울까요?')) { notes = []; persist(); } }
+function text() {
+  const d = new Date();
+  return `[피드백] ${vname} · 길이 ${tc(V.duration)} · ${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}\n(시간 = 분:초:프레임 ${FPS}fps · 대략 짚은 시각이에요. 앞뒤를 보고 정확한 자리를 찾아 주세요)\n\n` +
+    notes.map((n, i) => `${i + 1}. ${tc(n.a)}${n.b != null ? ' ~ ' + tc(n.b) : ''} · ${n.kind || '기타'}${n.pin ? ` · 화면 위치 (가로 ${n.pin[0]}%, 세로 ${n.pin[1]}%)` : ''}${n.line ? `\n   대사: ${n.line}` : ''}\n   ${n.memo || '(메모 없음)'}`).join('\n');
+}
+function copyAll() {
+  if (!notes.length) return toast('메모가 아직 없어요');
+  const t = text();
+  (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => toast('복사했어요 — Claude 에게 붙여 넣어 주세요'))
+    .catch(() => { const ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast('복사했어요'); });
+}
+function saveMd() {
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text()], { type: 'text/markdown' }));
+  a.download = '피드백_' + vname.replace(/\.mp4$/, '') + '.md'; a.click();
+}
+// ── 대사 줄 ──────────────────────────────────
+function parseSrt(raw) {
+  const out = []; raw = raw.replace(/\r/g, '');
+  raw.split(/\n\s*\n/).forEach(blk => {
+    const m = blk.match(/(\d+):(\d\d):(\d\d)[,.](\d{1,3})\s*-->\s*(\d+):(\d\d):(\d\d)[,.](\d{1,3})/); if (!m) return;
+    const t = (h, mi, s, f) => +h * 3600 + +mi * 60 + +s + +f / Math.pow(10, f.length);
+    const txt = blk.slice(m.index + m[0].length).split('\n').map(x => x.trim()).filter(Boolean).join(' ').replace(/<[^>]+>/g, '').trim();
+    if (txt) out.push([t(m[1], m[2], m[3], m[4]), t(m[5], m[6], m[7], m[8]), txt]);
+  });
+  return out.sort((x, y) => x[0] - y[0]);
+}
+function cueAt(t) {   // 지금 나오는 줄 · 줄 사이 빈틈이면 1초 안에 끝난 앞 줄(방금 들은 말)
+  let last = -1;
+  for (let i = 0; i < CUES.length; i++) { if (CUES[i][0] <= t && t <= CUES[i][1]) return i; if (CUES[i][1] < t) last = i; }
+  return last >= 0 && t - CUES[last][1] <= 1.0 ? last : -1;
+}
+function lineFor(n) {   // 메모 → 그때 대사 「…」 (범위면 걸친 줄 처음 ~ 끝)
+  if (!CUES.length) return '';
+  if (n.b == null) { const i = cueAt(n.a); return i >= 0 ? '「' + CUES[i][2] + '」' : ''; }
+  const hit = CUES.filter(c => c[1] >= n.a && c[0] <= n.b); if (!hit.length) return '';
+  return hit.length === 1 ? '「' + hit[0][2] + '」' : '「' + hit[0][2] + '」 ~ 「' + hit[hit.length - 1][2] + '」 (' + hit.length + '줄)';
+}
+function formLine() {
+  if (!cur || !CUES.length) { $('lnrow').style.display = 'none'; return; }
+  const a = parseTc($('fa').value), b = cur.b != null ? parseTc($('fb').value) : null;
+  const l = lineFor({ a: a == null ? cur.a : a, b: cur.b != null ? (b == null ? cur.b : b) : null });
+  $('lnrow').style.display = ''; $('fl').textContent = l || '(이 시각엔 대사가 없어요)';
+}
+['fa', 'fb'].forEach(id => $(id).addEventListener('input', formLine));
+let ccOn = true; try { ccOn = localStorage.getItem('fb:cc') !== '0'; } catch (e) {}
+function toggleCC() { ccOn = !ccOn; try { localStorage.setItem('fb:cc', ccOn ? '1' : '0'); } catch (e) {} cueI = -2; showCue(); }
+function showCue() {
+  const i = CUES.length ? cueAt(V.currentTime) : -3; if (i === cueI) return; cueI = i; const el = $('cue');
+  const showOv = ccOn && i >= 0; $('subov').classList.toggle('on', showOv); $('subtx').textContent = i >= 0 ? CUES[i][2] : '';
+  $('ccb').textContent = ccOn ? '자막 켬' : '자막 끔'; $('ccb').style.display = CUES.length ? '' : 'none';
+  if (!CUES.length) { el.className = 'off'; el.textContent = '자막이 없어요 — «자막 열기»로 .srt 를 열면 지금 나오는 대사가 여기 보여요'; }
+  else if (i < 0) { el.className = 'off'; el.textContent = '(대사 없음)'; }
+  else { el.className = ''; el.innerHTML = `<span class="ct">${tc(CUES[i][0], false)}</span><span>${esc(CUES[i][2])}</span>`; }
+  document.querySelectorAll('.ci').forEach(x => x.classList.toggle('on', +x.dataset.i === i));
+  const on = document.querySelector('.ci.on'); if (on && $('cues').style.display !== 'none') on.scrollIntoView({ block: 'nearest' });
+}
+function renderCues() {
+  $('cueN').textContent = CUES.length ? CUES.length : '';
+  $('cues').innerHTML = CUES.length ? CUES.map((c, i) => `<div class="ci" data-i="${i}" onclick="V.currentTime=${c[0]}"><span class="ct">${tc(c[0], false)}</span><span>${esc(c[2])}</span></div>`).join('')
+    : '<div class="hint">자막이 없어요.<br>«자막 열기»로 .srt 파일을 열면 대사 목록이 여기 나오고, 메모에 «그때 대사»가 함께 적혀요.</div>';
+  cueI = -2;
+}
+function jumpCue(d) {
+  if (!CUES.length) return; const t = V.currentTime; let i;
+  if (d > 0) { i = CUES.findIndex(c => c[0] > t + 0.05); if (i < 0) return; }
+  else { const c = cueAt(t); i = c >= 0 && t - CUES[c][0] > 0.6 ? c : (c >= 0 ? c - 1 : CUES.map(x => x[0] < t).lastIndexOf(true)); if (i < 0) i = 0; }
+  V.pause(); V.currentTime = CUES[i][0];
+}
+function tab(w) {
+  $('tMemo').classList.toggle('on', w === 'memo'); $('tCue').classList.toggle('on', w === 'cue');
+  $('list').style.display = w === 'memo' ? '' : 'none'; $('cues').style.display = w === 'cue' ? '' : 'none'; cueI = -2;
+}
+function toast(s) { const t = $('toast'); t.textContent = s; t.style.display = 'block'; clearTimeout(t._h); t._h = setTimeout(() => t.style.display = 'none', 1800); }
+
+// ── 단축키 ───────────────────────────────────
+document.addEventListener('keydown', e => {
+  const typing = ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName);
+  if (e.key === 'Escape') { closeForm(); return; }
+  if (typing) { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) save(); return; }
+  const k = e.key.toLowerCase();
+  if (k === ' ') { e.preventDefault(); toggle(); }
+  else if (k === 'arrowleft') step(-1); else if (k === 'arrowright') step(1);
+  else if (k === ',') step(-1 / FPS); else if (k === '.') step(1 / FPS);
+  else if (k === 'n') { e.preventDefault(); newPoint(); }
+  else if (k === 'c') toggleCC();
+  else if (k === '[') jumpCue(-1); else if (k === ']') jumpCue(1);
+  else if (k === 'i') markIn(); else if (k === 'o') { e.preventDefault(); markOut(); }
+});
+renderCues();
+</script>
+</body>
+</html>
