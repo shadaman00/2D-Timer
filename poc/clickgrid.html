@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>StudyPet Phase 0 — AC#1 2px 클릭 투과 검증 그리드</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: Consolas, "Malgun Gothic", monospace;
+      background: #181825;
+      color: #cdd6f4;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    header {
+      padding: 10px 16px;
+      background: #1e1e2e;
+      border-bottom: 1px solid #313244;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 14px;
+    }
+    #log {
+      color: #a6e3a1;
+      font-weight: bold;
+    }
+    #grid {
+      flex: 1;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, 8px);
+      grid-auto-rows: 8px;
+      gap: 0px;
+      cursor: crosshair;
+      position: relative;
+    }
+    .cell {
+      width: 8px;
+      height: 8px;
+      border-right: 1px solid rgba(255,255,255,0.06);
+      border-bottom: 1px solid rgba(255,255,255,0.06);
+      display: block;
+      text-decoration: none;
+    }
+    .cell:hover {
+      background: rgba(137, 180, 250, 0.45);
+    }
+    .cell.clicked {
+      background: #f38ba8 !important;
+    }
+    #fine-target {
+      position: fixed;
+      right: 40px;
+      bottom: 20px;
+      width: 400px;
+      height: 300px;
+      background: rgba(30, 30, 46, 0.9);
+      border: 2px solid #89b4fa;
+      display: grid;
+      grid-template-columns: repeat(200, 2px);
+      grid-template-rows: repeat(150, 2px);
+    }
+    .px2 {
+      width: 2px;
+      height: 2px;
+    }
+    .px2:nth-child(odd) {
+      background: rgba(255, 255, 255, 0.04);
+    }
+    .px2:hover {
+      background: #f9e2af;
+    }
+    .px2.hit {
+      background: #a6e3a1 !important;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <strong>AC#1 2px 클릭 투과 테스트</strong> — 우측 하단 파란 박스(2px 정밀 격자) 위에 캐릭터를 올리고 몸통 내부 vs 외곽 +2px 밖을 클릭하세요.
+    </div>
+    <div id="log">클릭 대기 중...</div>
+  </header>
+  <div id="grid"></div>
+  <div id="fine-target" title="2px x 2px 정밀 링크 영역"></div>
+
+  <script>
+    const logEl = document.getElementById('log');
+    const fineTarget = document.getElementById('fine-target');
+
+    // 우측 하단 2px 정밀 격자 (200 x 150 = 30,000 셀 대신 이벤트 위임으로 1px/2px 정밀 판정)
+    fineTarget.addEventListener('click', (e) => {
+      const rect = fineTarget.getBoundingClientRect();
+      const relX = Math.floor(e.clientX - rect.left);
+      const relY = Math.floor(e.clientY - rect.top);
+      const cellX = Math.floor(relX / 2) * 2;
+      const cellY = Math.floor(relY / 2) * 2;
+
+      const marker = document.createElement('a');
+      marker.href = `#hit-${cellX}-${cellY}`;
+      marker.style.position = 'absolute';
+      marker.style.left = `${cellX}px`;
+      marker.style.top = `${cellY}px`;
+      marker.style.width = '2px';
+      marker.style.height = '2px';
+      marker.style.background = '#a6e3a1';
+      fineTarget.appendChild(marker);
+
+      logEl.textContent = `[투과 성공!] 뒤쪽 브라우저 2px 셀 클릭됨 — 화면(${e.screenX}, ${e.screenY}) / 격자(${cellX}px, ${cellY}px)`;
+    });
+
+    document.body.addEventListener('click', (e) => {
+      if (e.target === fineTarget || fineTarget.contains(e.target)) return;
+      logEl.textContent = `[배경 클릭 투과됨] 화면(${e.screenX}, ${e.screenY}) / 클라이언트(${e.clientX}, ${e.clientY})`;
+    });
+  </script>
+</body>
+</html>
+

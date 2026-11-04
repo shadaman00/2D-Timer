@@ -1,0 +1,17 @@
+# StudyPet default_pixel_cat 16색 이하 팔레트 (. = 투명)
+. = transparent
+K = #282328
+B = #F5E6D3
+S = #DEC6B0
+W = #FFFDF9
+P = #F29CB1
+E = #362F3B
+C = #F7838D
+D = #A86B43
+L = #754729
+N = #6C7A89
+M = #8CE0F5
+Y = #FFD859
+G = #7CD992
+R = #F26D6D
+Z = #99B4FF

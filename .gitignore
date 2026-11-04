@@ -1,0 +1,16 @@
+# 개발용 런타임 복사본 및 실행/빌드 산출물 (DEVELOPMENT_PLAN.md 13장)
+runtime/dev/
+data-dev/
+data/
+dist/
+
+# Python 바이트코드 및 캐시
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS 및 에디터 임시 파일
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
